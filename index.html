@@ -1,0 +1,187 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Gallery</title>
+  <style>
+    #gallery {
+      display: none;
+      justify-content: center;
+      align-items: center;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0, 0, 0, 0.8);
+    }
+    #gallery img {
+      max-width: 100%;
+      max-height: 100%;
+    }
+    #thumbnailGrid img {
+      width: 150px;
+      height: auto;
+      cursor: pointer;
+      border: 2px solid #ccc;
+    }
+    #thumbnailGrid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    #backToAlbums {
+      margin: 10px 0;
+    }
+  </style>
+</head>
+<body>
+  <h2>Albums</h2>
+  <div class="album-list" id="albumList"></div>
+
+  <button id="backToAlbums" style="margin: 10px 0; display: none;">⬅️ Back to Albums</button>
+  <div id="thumbnailGrid"></div>
+
+  <div id="gallery">
+    <!-- <span id="close">&times;</span> -->
+    <!-- Inside the #gallery div -->
+    <button id="close" style="position: absolute; top: 20px; left: 20px; color: white; font-size: 20px; background: rgba(0, 0, 0, 0.6); border: none; padding: 10px; cursor: pointer;">Close</button>
+
+    <button id="prev" style="position: absolute; left: 20px; color: white; font-size: 40px;">&#10094;</button>
+    <img id="slide" src="">
+    <div id="caption" style="color: white; font-size: 20px; margin-top: 15px;"></div>
+    <button id="next" style="position: absolute; right: 20px; color: white; font-size: 40px;">&#10095;</button>
+  </div>
+
+  <script>
+    const albumList = document.getElementById('albumList');
+    const thumbnailGrid = document.getElementById('thumbnailGrid');
+    const gallery = document.getElementById('gallery');
+    const slide = document.getElementById('slide');
+    const caption = document.getElementById('caption');
+    const closeBtn = document.getElementById('close');
+    const prevBtn = document.getElementById('prev');
+    const nextBtn = document.getElementById('next');
+    const backToAlbumsBtn = document.getElementById('backToAlbums');
+    let albumsData = {};
+    let currentAlbum = [];
+    let currentIndex = 0;
+    let slideshowInterval;
+
+    function showImage(index) {
+      const imageUrl = currentAlbum[index];
+      slide.src = imageUrl;
+      const filename = imageUrl.split('/').pop().split('.')[0];
+      const readable = filename.replace(/[-_]/g, ' ').replace(/\w/g, c => c.toUpperCase());
+      caption.textContent = readable;
+    }
+
+    function startSlideshow(images, startIndex = 0) {
+      currentAlbum = images;
+      currentIndex = startIndex;
+      gallery.style.display = 'flex';
+      closeBtn.style.display = 'block';  // Ensure Close button is shown
+      showImage(currentIndex);
+      thumbnailGrid.innerHTML = '';
+      if (gallery.requestFullscreen) {
+        gallery.requestFullscreen();
+      }
+      if (slideshowInterval) clearInterval(slideshowInterval);
+      slideshowInterval = setInterval(() => {
+        currentIndex++;
+        if (currentIndex >= currentAlbum.length) {
+          clearInterval(slideshowInterval);
+          return;
+        }
+        showImage(currentIndex);
+      }, 3000);
+    }
+
+    function startThumbnailGrid(images) {
+      currentAlbum = images;
+      albumList.style.display = 'none';
+      backToAlbumsBtn.style.display = 'inline-block';
+      thumbnailGrid.innerHTML = '';
+      images.forEach((imgSrc, index) => {
+        const thumb = document.createElement('img');
+        thumb.src = imgSrc;
+        thumb.onclick = () => startSlideshow(images, index);
+        thumbnailGrid.appendChild(thumb);
+      });
+    }
+
+    backToAlbumsBtn.onclick = () => {
+      albumList.style.display = 'flex';
+      backToAlbumsBtn.style.display = 'none';
+      thumbnailGrid.innerHTML = '';
+      localStorage.removeItem('lastAlbum');
+    };
+
+    // Add functionality to the close button
+    closeBtn.onclick = () => {
+      gallery.style.display = 'none';
+      clearInterval(slideshowInterval);
+      if (document.fullscreenElement) {
+        document.exitFullscreen();
+      }
+      startThumbnailGrid(currentAlbum);
+      albumList.style.display = 'flex';  // Ensure album list is shown after exiting fullscreen
+    };
+
+    // Add functionality for Esc key to close gallery
+    document.addEventListener('keydown', (event) => {
+      if (gallery.style.display === 'flex' && event.key === 'Escape') {
+        closeBtn.click();  // Trigger the close button
+      }
+    });
+
+
+    document.addEventListener('keydown', (event) => {
+      if (gallery.style.display === 'flex') {
+        if (event.key === 'ArrowLeft') {
+          prevBtn.click();  // Trigger previous button
+        } else if (event.key === 'ArrowRight') {
+          nextBtn.click();  // Trigger next button
+        }
+      }
+    });
+
+    nextBtn.onclick = () => {
+      if (currentIndex < currentAlbum.length - 1) {
+        currentIndex++;
+        showImage(currentIndex);
+        clearInterval(slideshowInterval);
+      }
+    };
+
+    prevBtn.onclick = () => {
+      if (currentIndex > 0) {
+        currentIndex--;
+        showImage(currentIndex);
+        clearInterval(slideshowInterval);
+      }
+    };
+
+    fetch('list-albums.php')
+      .then(res => res.json())
+      .then(data => {
+        albumsData = data;
+        Object.keys(data).forEach(albumName => {
+          const btn = document.createElement('button');
+          btn.textContent = albumName;
+          btn.onclick = () => {
+            localStorage.setItem('lastAlbum', albumName);
+            startThumbnailGrid(data[albumName]);
+          };
+          albumList.appendChild(btn);
+        });
+        const lastAlbum = localStorage.getItem('lastAlbum');
+        if (lastAlbum && data[lastAlbum]) {
+          startThumbnailGrid(data[lastAlbum]);
+        }
+      });
+  </script>
+</body>
+</html>
